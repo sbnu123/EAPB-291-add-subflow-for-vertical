@@ -1,0 +1,1722 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="nu-qt-integrations-inbound-main">
+        <http:listener config-ref="nu-qt-integrations-inbound-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <set-variable value='#[( if(attributes["Method"] != null) attributes["Method"]  as String else "") ++ ":" ++  (if(attributes.Headers != null) ( if (attributes.Headers["host"] != null) attributes.Headers["host"] as String else "") else "" ) ++ ( if(attributes["requestUri"] != null) attributes["requestUri"] as String else "")]' doc:name="serviceUrl" doc:id="1d64de6c-efe4-436d-ba18-5d44ebb8fbee" variableName="serviceUrl"/>
+		<set-variable value='#[(now() as String{format: "yyyyMMdd"} ++ uuid())]' doc:name="serviceTransId" doc:id="747519c9-8570-4ea7-ae7b-c3c75cc59198" variableName="serviceTransId"/>
+		<set-variable value="#[payload.ExtTransactionId]" doc:name="serviceExtTransId" doc:id="697f785f-1401-4615-8195-7ab215bcfaee" variableName="serviceExtTransId"/>
+		<set-variable value='#[attributes["requestUri"]]' doc:name="serviceAction" doc:id="a9e03363-cdff-4751-9ffc-98c48b941359" variableName="serviceAction"/>
+		<set-variable value="#[now() as DateTime{format: &quot;yyyy-MM-dd'T'HH:MM:ss&quot;}]" doc:name="serviceStartedOn" doc:id="deb9dd24-80d7-444e-899e-4efaa750dbd2" variableName="serviceStartedOn"/>
+		<logger level="INFO" doc:name="Logger" doc:id="8a1ba254-ec80-440e-8256-50523fd66d44" message='@@ server URL #[vars.serviceUrl] @@ attr #[attributes.Headers]'/>
+		<apikit:router config-ref="nu-qt-integrations-inbound-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="f2096f84-d9f4-403d-9f17-970bfe57cd35">
+				<ee:transform doc:name="Transform Message" doc:id="e69f0e7e-fa6b-4e1c-940f-7aede058af31">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Status: "Error",
+	TransactionId: vars.serviceTransId,
+	Message: "Invalid payload."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+        
+</error-handler>
+    </flow>
+    <flow name="nu-qt-integrations-inbound-console">
+        <http:listener config-ref="nu-qt-integrations-inbound-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="nu-qt-integrations-inbound-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        
+</error-handler>
+    </flow>
+    <flow name="post:\qt\atc-update:application\json:nu-qt-integrations-inbound-config">
+        
+		<ee:transform doc:name="Transform Lead Payload" doc:id="5f847b60-cf51-41a3-a04a-bf3c684d8ad3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT", 
+	(ATC_Result__c: payload.ATCResult) if(payload.ATCResult != null),
+	NEP_DispositionChangedDateTime__c: now() as DateTime
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id__c
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/atc-update"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="ebcd3813-b187-4857-ad07-c840960e924d" message="Input Payload #[payload]"/>
+		<salesforce:update type="Lead" doc:name="sf-ncu-update" doc:id="767d933a-1102-42a3-8a76-ee073a07add9" config-ref="sf-ncu-config"/>
+		<ee:transform doc:name="Transform Message" doc:id="91c5b8b7-4c30-42bd-a0f2-3c99bc31bc83" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="1199e35c-ed6c-4e43-a37f-7f555c49587c" message="After Update #[payload] #[vars.id_vars[0].SF_Id]"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+        
+</ee:transform>
+        <async doc:name="Async" doc:id="592b2278-49e8-4f28-9ec6-f56bbac2f834" >
+							<flow-ref doc:name="LogTransaction flow" doc:id="7621ee26-5265-495d-b483-8aa8822a1a17" name="LogTransaction_flow"/>
+		</async>
+    </flow>
+	<flow name="post:\qt\cancel-update:application\json:nu-qt-integrations-inbound-config">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="b1b0492b-5afe-4f78-9997-c44c0c2da261" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT",
+	(Lead_Status_Validation__c: payload.ApplicantStatus) if(payload.ApplicantStatus != null),
+	(Status: payload.ApplicantStatus) if(payload.ApplicantStatus != null),
+	(Cancel_Reason_text__c: payload.CancelReason) if(payload.CancelReason != null),
+	(NEP_Cancel_Reason_Group__c : payload.CancelReasonGroup) if(payload.CancelReasonGroup != null)
+}]
+	
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id__c
+}]]]></ee:set-variable>
+<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/cancel-update"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="24473afd-21b0-41d6-a27b-22a03ffbcab9" message="Input Payload #[payload]"/>
+		<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="ae9d7233-30f5-40e1-a048-8a4b38d28114" config-ref="sf-ncu-config" />
+		<ee:transform doc:name="Transform Message" doc:id="bcc449c9-0d55-4c28-b0b7-602b965b3a6b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="c00a811a-26a9-4e1f-b173-c7a26b84c277" message="After Update #[payload]"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+        
+</ee:transform>
+        <async doc:name="Async" doc:id="de2a1caa-9b8d-4448-9004-213ef04aed4d" >
+							<flow-ref doc:name="LogTransaction flow" doc:id="9bab84fc-b974-49f0-b4f8-04071e9b550c" name="LogTransaction_flow"/>
+		</async>
+    
+</flow>
+	<flow name="post:\qt\lead-update:application\json:nu-qt-integrations-inbound-config">
+        <ee:transform doc:name="payload" doc:id="3ad3c75f-cd75-4d92-879a-e5811ca022e7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: payload.EntityName,
+	action:"qt/lead-update"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<choice doc:name="Choice" doc:id="4984fcc7-d9b3-43e1-8f2d-a12705874ec5" >
+			<when expression="#[payload.EntityName == null]">
+				<logger level="INFO" doc:name="Logger" doc:id="888624ee-ee8b-4d96-95b8-5ab9783dd083" message="@@Updating Lead  #[payload]"/>
+				<ee:transform doc:name="Transform Lead Payload" doc:id="cbe3997e-c813-4b9e-93de-967ed928d1de">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT",
+	(NEP_Is_Military__c: payload.IsMilitary as Boolean) if(payload.IsMilitary != null),
+	//(NEP_School_Code__c: payload.School__c) if(payload.School__c != null) ,
+	(Military_Affiliation__c: payload.MilitaryAffiliation) if(payload.MilitaryAffiliation !=null),
+	(Military_Status__c: payload.MilitaryStatus) if(payload.MilitaryStatus !=null),
+	(Military_Branch__c: payload.MilitaryBranch) if(payload.MilitaryBranch !=null),
+	(Phone: payload.PhoneNumber) if(payload.PhoneNumber !=null),
+	(Email: payload.EmailAddress) if(payload.EmailAddress !=null),
+    (NEP_Employer_Other__c: payload.EmployerOther) if(payload.EmployerOther !=null),
+    (Employer__c: payload.Employer) if(payload.Employer !=null),
+    (NEP_Is_qt_ca_base__c: payload.BaseClassLocation) if(payload.BaseClassLocation !=null)
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="id_vars"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id
+}]]]></ee:set-variable>
+<ee:set-variable variableName="payload_info"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<salesforce:query doc:name="sfncu-query" doc:id="99ed72e7-0167-4a28-849e-9dd5bbeb6554" config-ref="sf-ncu-config" target="leadRecord">
+					<salesforce:salesforce-query ><![CDATA[SELECT
+	Id, Application__c
+FROM
+	lead
+WHERE
+	id =  ':sfId']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"sfId" : payload[0].Id
+}]]]></salesforce:parameters>
+				</salesforce:query>
+				<logger level="INFO" doc:name="leadRecord" doc:id="e97392e9-a5e1-4d99-a71c-b2e386b85b1a" message="@@ LeadRecord: #[vars.leadRecord]]"/>
+				<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="dd7de3c5-f42b-449f-839e-4c3250e4311d" config-ref="sf-ncu-config" />
+				<choice doc:name="Choice" doc:id="efaa5d2e-22c5-4729-981f-e9a37caa9f17" >
+					<when expression="#[vars.leadRecord[0].Application__c != null]">
+						<ee:transform doc:name="Transform Message" doc:id="8a347e2d-b839-4341-a8bb-b75f4b199012">
+							<ee:message>
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable variableName="applicatonUpdatePayload" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	Id: vars.leadRecord[0].Application__c,
+	(NEP_School_Code__c: vars.payload_info.SchoolCode) if(vars.payload_info.SchoolCode != null) ,
+}]]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="INFO" doc:name="Before Application Update" doc:id="41c7d95c-65cc-4bcd-aab4-206da77aef8f" message="@@ Before applicant update applicationId: #[vars.applicatonUpdatePayload]  leadRec: #[vars.leadRecord[0]]"/>
+						<salesforce:update doc:name="sfncu-update" doc:id="5328bb8c-e7f0-4fe6-80ac-d2450c634ebd" config-ref="sf-ncu-config" type="hed__Application__c" target="applicationUpdateAfter">
+							<salesforce:records ><![CDATA[#[%dw 2.0
+---
+vars.applicatonUpdatePayload]]]></salesforce:records>
+						</salesforce:update>
+						<logger level="INFO" doc:name="After Appliation Update" doc:id="03057a1e-3da2-4165-84c2-71f48f746798" message="@@ After Application Update: #[vars.applicationUpdateAfter]"/>
+					
+</when>
+				</choice>
+			
+
+</when>
+			<when expression='#[payload.EntityName == "Consent"]'>
+				<logger level="INFO" doc:name="Logger" doc:id="9aee1d9d-8dba-4c58-9570-0730b7b9adb8" message="@@Updating ConsentLead"/>
+				<salesforce:query doc:name="sfncu-query" doc:id="5171b585-e118-4758-a1bb-70250e029461" config-ref="sf-ncu-config" target="consentRecord">
+			<salesforce:salesforce-query><![CDATA[SELECT
+	Active_Consent__r.Id
+FROM
+	lead
+WHERE
+	id =  ':sfId']]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"sfId" : payload.Lead_SF_Id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+				<ee:transform doc:name="Transform Message" doc:id="64ab8e9f-a0f8-4939-8e5f-8a2d83aa4a06">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="consentPayload"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	Id: vars.consentRecord.Active_Consent__r.Id[0],
+	(TCPA__c : payload.PhoneConsent) if(payload.PhoneConsent !=null),
+	(DNC_Status__c: payload.DNCStatus as Boolean) if(payload.DNCStatus !=null),
+	(Email_opt_out__c: if(payload.EmailConsent == "Opt Out") true else false) if(payload.EmailConsent !=null)
+}]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<salesforce:update doc:name="sfncu-update-consent" doc:id="81402540-599b-433b-ac27-066083d0fb9a" config-ref="sf-ncu-config" type="Consent__c">
+			<salesforce:records><![CDATA[#[vars.consentPayload]]]></salesforce:records>
+		</salesforce:update>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="33740282-a461-4673-a399-4fbfca96f436" message="@@ update type  not found  #[payload]  "/>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="19797b99-161e-4744-9b31-a3d87c401e9b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="f8f37298-8d81-47cf-bd38-6e46475b96c2" message="After Update #[payload]"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+        
+</ee:transform>
+        <async doc:name="Async" doc:id="0a21ec0a-a5b2-48af-95dc-34a51a45a2b9" >
+							<flow-ref doc:name="LogTransaction Flow" doc:id="fedd1a25-fb89-4627-b288-c13410e35e96" name="LogTransaction_flow"/>
+		</async>
+    </flow>
+    <flow name="post:\qt\rightparty-contact:application\json:nu-qt-integrations-inbound-config">
+       <ee:transform doc:name="Transform Lead Payload" doc:id="a68a47f8-25ad-41ba-afb9-92803a749b42" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT",
+	(OwnerId: payload.Lead_Owner_SF_Id) if(payload.Lead_Owner_SF_Id != null),
+	ATC_Result__c: if(payload.ATCResult != null) payload.ATCResult else "Right party contact", 	
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id
+}]]]></ee:set-variable>
+<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/rightparty-contact"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="09c01a15-684e-41c7-95d7-517a6c589f35" message="Input Payload #[payload]"/>
+		<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="623225b4-715e-4cdf-aa21-d1ed362b1412" config-ref="sf-ncu-config"/>
+		<ee:transform doc:name="Transform Message" doc:id="2e7b43ef-240f-4a74-9dfc-a700188ad499" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="b910930a-1af2-4536-a1d6-63c04e8d08f3" message="After Update #[payload]"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+        
+</ee:transform>
+        <async doc:name="Async" doc:id="c591c74d-72c0-4dba-93e0-e3c3fd334265" >
+							<flow-ref doc:name="LogTransaction flow" doc:id="51f08da6-b847-4284-84b9-c539a7d674b5" name="LogTransaction_flow"/>
+		</async>
+    </flow>
+    <flow name="post:\qt\transfer-update:application\json:nu-qt-integrations-inbound-config">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="4e670ac4-1d3e-498b-852c-da704250faa9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+
+ import * from dw::util::Coercions
+ var transDateTime = if(payload.TransferredDateTime != null) 
+ if (payload.TransferredDateTime contains ("Z")) 
+    toDateTime(payload.TransferredDateTime)
+ else if (payload.TransferredDateTime contains (".000+0000"))
+    toDateTime(payload.TransferredDateTime replace ".000+0000" with "Z")
+ else 
+    toDateTime(payload.TransferredDateTime) 
+ else
+    null 
+
+---
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT",
+	(NEP_Is_Military__c: payload.IsMilitary as Boolean) if(payload.IsMilitary != null),
+	(QnT_Transfer_Result__c: payload.QntTransferResult) if(payload.QntTransferResult !=null),
+	Transferred_DateTime__c: transDateTime,
+	(NEP_School_Code__c: payload.SchoolCode) if(payload.SchoolCode !=null)	
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id
+}]]]></ee:set-variable>
+<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/transfer-update"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="5e276a5a-b86f-4862-ba82-55e42e8e60e8" message="Input Payload #[payload]"/>
+		<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="ea284b46-6047-4e40-bfa8-7cc156df9d07" config-ref="sf-ncu-config"/>
+		<ee:transform doc:name="Transform Message" doc:id="9e20af8e-b4d8-4743-b4e0-77691fdffe04" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="f692cd95-13d3-4fb0-ae5b-5e8c6dc0d330" message="After Update #[payload]"/>
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+        
+</ee:transform>
+        <async doc:name="Async" doc:id="675f7d07-8e2c-4d17-a066-c115e100edb4" >
+							<flow-ref doc:name="LogTransaction Flow" doc:id="f31251ec-c2af-4ae9-a672-db1e0e6ea479" name="LogTransaction_flow"/>
+		</async>
+    </flow>
+    <flow name="post:\qt\reject-reason:application\json:nu-qt-integrations-inbound-config">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="aa3cefdd-691e-46ee-b4c0-5336e3937a8a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+
+---
+[{
+	Id: payload.Lead_SF_Id,
+	(NEP_Reject_Reason__c : payload.RejectReason) if(payload.RejectReason !=null)	
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="id_vars"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/reject-reason"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="19d03153-242a-4415-ad36-7f69bb6e0e83" message="Input Payload #[payload]" />
+		<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="92f5171f-39b6-423f-b5b8-64b743617fee" config-ref="sf-ncu-config" />
+		<ee:transform doc:name="Transform Message" doc:id="32b3c3f7-d03d-43f5-9a19-55d92e9c3ecf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="d173989a-1aa4-4e86-9f4a-ec4751dc38fb" message="After Update #[payload]" />
+		<ee:transform doc:name="Transform Message" doc:id="feeffed3-416a-4afc-8b65-86200e1ce6b3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="3628e1e0-58d3-45a0-b9ac-89da408a347b" >
+			<flow-ref doc:name="LogTransaction flow" doc:id="11d70a0d-9afd-4de9-8b4c-80b18acbac1e" name="LogTransaction_flow" />
+		</async>
+    </flow>
+    <flow name="post:\qt\foreign-credential:application\json:nu-qt-integrations-inbound-config">
+		<ee:transform doc:name="Transform Lead Payload" doc:id="314c4c70-76fa-4569-bdfa-52c4c54d7837" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+
+import * from dw::util::Coercions
+var transDateTime = if(payload.TransferredDateTime != null) 
+     if (payload.TransferredDateTime contains ("Z")) 
+        toDateTime(payload.TransferredDateTime)
+     else if (payload.TransferredDateTime contains (".000+0000"))
+        toDateTime(payload.TransferredDateTime replace ".000+0000" with "Z")
+     else 
+        toDateTime(payload.TransferredDateTime) 
+     else
+        null 
+
+---
+[{
+	Id: payload.Lead_SF_Id,
+	NEP_Last_Modified_Source__c: if(payload.VendorId != null) payload.VendorId else "QT",
+	(NEP_Is_Military__c: payload.IsMilitary as Boolean) if(payload.IsMilitary != null),
+	(QnT_Transfer_Result__c: payload.QntTransferResult) if(payload.QntTransferResult !=null),
+	Transferred_DateTime__c: transDateTime,
+	(NEP_School_Code__c: payload.SchoolCode) if(payload.SchoolCode !=null),
+	(Skillset_Foreign_Credential__c: if(payload.IsInternational == "true" or payload.IsInternational == "True" or payload.IsInternational == "TRUE") true else false) if(payload.IsInternational !=null)
+	
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	SF_Id: payload.Lead_SF_Id__c
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: payload.VendorId,
+	sourceEntityId: '',
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: payload.Lead_SF_Id,
+	targetEntityName: "Lead",
+	action:"qt/foreign-credential"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="c49d113a-defe-4b3b-aa06-569cd626e5ae" message="Input Payload #[payload]" />
+		<salesforce:update type="Lead" doc:name="sfncu-update" doc:id="6d8fdc5d-cc49-4e9a-9ed4-cd18018f4c83" config-ref="sf-ncu-config" />
+		<ee:transform doc:name="Transform Message" doc:id="0b8d2423-5f54-4e12-b609-9bb88005ce71" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="2a946244-91c7-484a-b018-d97bf12979f6" message="After Update #[payload]" />
+		<ee:transform doc:name="Transform Message" doc:id="e4a9ff9c-3f20-411b-8aec-e003eee2bcbb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="7df5d7cc-6bd0-46b5-8c61-3c9fc0dad512" >
+			<flow-ref doc:name="LogTransaction flow" doc:id="f876892c-9423-48e9-a0d0-a0e6793bb718" name="LogTransaction_flow" />
+		</async>
+    </flow>
+    <flow name="post:\vendor\lead-insert:application\json:nu-qt-integrations-inbound-config" doc:id="afbc9b38-35b1-4651-b0bd-ffa436acc2c8">
+		<ee:transform doc:name="Transform payload" doc:id="f96504c5-684b-4bf0-8b55-0801400d6a3a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="f5f673ba-0d3a-40c3-9dda-d7327e9b0627" >
+			<when expression='#[payload.VendorId == "EU"]'>
+				<flow-ref doc:name="Flow Reference" doc:id="c6728a51-4c91-47f2-aa99-bac31322eb18" name="post:\eu\lead-insert:application\json:nu-qt-integrations-inbound-config"/>
+			</when>
+			<when expression='#[payload.VendorId == "QT-Test"]'>
+				<flow-ref doc:name="qt-test-inset-lead" doc:id="51e76ce2-3f14-4e82-a03b-f05deb43646a" name="post:\qt-test\lead-insert:application\json:nu-qt-integrations-inbound-config"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="afece482-9b10-496a-8e3b-fa1dba2297f9" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "VendorId Not Valid"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	    <flow name="post:\vendor\stop-call:application\json:nu-qt-integrations-inbound-config" doc:id="e661adf9-026f-494a-8ba5-566459a2f103">
+		<ee:transform doc:name="Transform payload" doc:id="5893ee35-8a13-4a08-ab40-a53529003ca0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="e2a22039-2e68-42d1-b743-6a84ff0206ad" >
+			<when expression='#[payload.VendorId == "EU"]'>
+				<flow-ref doc:name="eu-stop-call" doc:id="5ada0c1b-d5c5-4b72-bafa-2924e221bed6" name="post:\eu\stop-call:application\json:nu-qt-integrations-inbound-config"/>
+			</when>
+			<when expression='#[payload.VendorId == "QT-Test"]'>
+				<flow-ref doc:name="qt-test-stop-call" doc:id="55ed257a-16c0-4011-bb32-1a8002c590e1" name="post:\qt-test\stop-call:application\json:nu-qt-integrations-inbound-config"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="59a75eda-d013-4dde-8cc6-3063d04f6326" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "VendorId Not Valid"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="post:\eu\lead-insert:application\json:nu-qt-integrations-inbound-config" doc:id="1bee2add-921e-4d9b-ace4-cd6792042d03">
+		<ee:transform doc:name="Transform Message" doc:id="8c6b4e3c-b42c-4ab4-a7e2-6f94a11ff972" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[output application/java
+import * from dw::util::Coercions
+var inqDateTime = if(payload.InquiryReceivedDateTime != null) 
+     if (payload.InquiryReceivedDateTime contains ("Z")) 
+        toDateTime(payload.InquiryReceivedDateTime)
+     else if (payload.InquiryReceivedDateTime contains (".000+0000"))
+        toDateTime(payload.InquiryReceivedDateTime replace ".000+0000" with "Z")
+     else 
+        toDateTime(payload.InquiryReceivedDateTime) 
+     else
+        null 
+	
+---
+[{
+  
+ "ExternalLeadID__c": payload.ExternalLeadId,
+ "SupplierID__c": payload.SupplierId,
+ "SupplierPassword__c": payload.SupplierPassword,
+ "Company": "NU",
+ "FirstName": payload.FirstName,
+ "LastName": payload.LastName,
+ "Email":  payload.Email,
+ "Street": payload.Address,
+ "City": payload.City,
+ "State": payload.State,
+ "PostalCode": payload.PostalCode,
+ "Phone": payload.Phone,
+ "CurrentEmployer__c": payload.CurrentEmployer,
+ "BestCallTime__c": payload.BestCallTime, 
+ "InquiryReceivedDateTime__c": inqDateTime,
+ "IPAddress__c": payload.IPAddress,
+ "Adkey__c": payload.Adkey,
+ "Affiliate__c": payload.Affiliate,
+ "ContactMethod__c": payload.ContactMethod,
+ "LMSReference__c": payload.LMSReference,
+ "MilitaryStatus__c": payload.MilitaryStatus,
+ "UtmCampaign__c": payload.UtmCampaign,
+ "UtmContent__c": payload.UtmContent,
+ "UtmMedium__c": payload.UtmMedium,
+ "UtmSource__c": payload.UtmSource,
+ "UtmTerm__c": payload.UtmTerm,
+ "Vertical__c": payload.Vertical,
+ "ApplicantStatus__c": payload.ApplicantStatus,
+ "ApplicationType__c": payload.ApplicationType,
+ "InquiryType__c": payload.InquiryType,
+ "JornayaScore__c": payload.JornayaScore,
+ "LeadProvider__c": payload.LeadProvider,
+ "RoutingCode__c": payload.RoutingCode,
+ "MilitaryBranch__c": payload.MilitaryBranch,
+ "MilitaryAffiliation__c": payload.MilitaryAffiliation,
+ "SchoolName__c": payload.SchoolName,
+ "SchoolCode__c": payload.SchoolCode,
+ "ProgramName__c": payload.ProgramName,
+ "ProgramCode__c": payload.ProgramCode   
+}]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextData" ><![CDATA[output application/java
+---
+{
+	transType: "Insert",
+	sourceAppId: "sf-eu",
+	sourceEntityId: payload.ExternalLeadId,
+	sourceEntityName: "Lead",
+	targetAppId: "sf-eu",
+	targetEntityId: null,
+	targetEntityName: "Lead",
+	action:"vendor/eu-insert-lead"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="id_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	ExternalLeadId: payload.ExternalLeadId
+}]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message remove Vertical__c" doc:id="beb946c1-7644-4fea-846b-cb750af4de70" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+
+---
+ payload map(Item,key) -> {
+ 	
+ (Item - "Vertical__c")	
+ 	
+ }]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="509bec4e-2442-469a-8acd-590d87abd988" message="Input Payload #[payload]" />
+		<salesforce:query doc:name="sf-eu query for existing lead in EU." doc:id="6fdffaa3-385d-414f-97cc-412978543a57" config-ref="sf-eu-config-uat" target="existingLeadRecord" readTimeoutUnit="DAYS">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id FROM Lead where ExternalLeadId__c =  ':externalLeadId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{"externalLeadId" : vars.id_vars[0].ExternalLeadId }]]]></salesforce:parameters>
+			<salesforce:headers />
+		
+</salesforce:query>
+		<flow-ref doc:name="Flow Reference Get Vertical" doc:id="9cc66543-6fa7-4f50-ae36-234acca03039" name="nu-eu-integrations-inboundSub_Flowleadinsert" />
+		<logger level="INFO" doc:name="Logger Payload afer Flow Reference" doc:id="b79a4620-1ea8-47a2-be6f-7413571fa6e8" message="#[payload]"/>
+		<choice doc:name="Choice" doc:id="ea58ced2-cec5-4467-9d83-8905525046fb" >
+			<when expression="#[sizeOf(vars.existingLeadRecord) &lt; 1]">
+				<salesforce:create type="Lead" doc:name="sf-eu-insert lead" doc:id="f382bf8f-68bf-4802-a8db-b36113b3e7a8" config-ref="sf-eu-config-uat">
+					<salesforce:headers />
+				</salesforce:create>
+			
+</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="156e65ea-ed88-4eee-87eb-7974938518e9" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"message":"Lead already exist in the system."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="750d8947-f744-42c5-b232-9359bae62ddf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="19e8dde3-fa34-438e-b1df-b123107d48da" message="@@ After Update #[payload]  contextData:  #[vars.contextData]" />
+		<ee:transform doc:name="Transform Message" doc:id="b71e4b21-0e72-4eea-8d3f-2016d413b0ad" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="3ff1322f-1ba4-4074-a9d1-715a1b4ed1d3" >
+			<flow-ref doc:name="TransactionLog_flow" doc:id="7be339a9-2de3-40e1-8e62-8cb2c226ccfa" name="LogTransaction_flow" />
+		</async>
+    </flow>
+    <sub-flow name="nu-eu-integrations-inboundSub_Flowleadinsert" doc:id="6e9004ee-2b4a-409c-8adc-12f3e3a01a5c" >
+		<ee:transform doc:name="Transform Message" doc:id="21973916-24b0-48a8-9ff3-581ef3effaba" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="nuprogramcodevar" ><![CDATA[%dw 2.0
+output application/json
+
+var programcodeVar =(vars.payload_info.ProgramCode != null) and
+ ( sizeOf(vars.existingLeadRecord) < 1 )
+
+ // Want to do a query on program code programcodevar returns true or false
+---
+{
+	nothasSFlead :programcodeVar
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="34139b5f-7287-45b0-bf04-6adce61e7f67" message="#[payload]"/>
+		<choice doc:name="Choice" doc:id="472c7fb1-e6e8-4d3d-8549-47087f86d876" >
+			<when expression="#[vars.nuprogramcodevar.nothasSFlead == true]">
+				<salesforce:query doc:name="Query Vertical ProgramCode" doc:id="e5058215-b970-47b4-9089-7f4f73c30502" config-ref="sf-ncu-config" target="verticalqueryVar" readTimeoutUnit="MICROSECONDS">
+			<salesforce:salesforce-query><![CDATA[SELECT Id, Tag_Code__c  from  NEP_Account_Tag__c where Id != null 
+
+and Account_System_Code_FM__c = ':programcode' order by createddate desc limit 6
+]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"programcode" : vars.payload_info.ProgramCode
+	
+}]]]></salesforce:parameters>
+					<salesforce:headers />
+		</salesforce:query>
+				<logger level="INFO" doc:name="Logger for Vertical Query" doc:id="875862a8-c1f9-4584-a2d9-6ad943eea9b2" message="#[payload]" />
+				<set-variable value="#[vars.verticalqueryVar.*Tag_Code__c]" doc:name="Set Variable Vertical Tag Code" doc:id="edf8c284-81a4-4dee-83cd-60cab763d235" variableName="myverticalarrayVar"/>
+				<ee:transform doc:name="Transform Message for Vertical Format" doc:id="6b5438db-6edb-4f07-8edc-0a7cdd246fc2">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+						<ee:set-variable variableName="verticalpayloadVar" ><![CDATA[%dw 2.0
+output application/dw
+
+var myverticalstringVar =vars.myverticalarrayVar as Array joinBy (",")
+---
+
+  myverticalstringVar
+  ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<logger level="INFO" doc:name="Logger for Vertical Transformed" doc:id="281dbe93-7b99-49bd-bc5e-718f43b9632f" message="#[vars.verticalpayloadVar]" />
+				<salesforce:query doc:name="Query LeadSource and Desired_Start_timeframe" doc:id="9e847c1d-f0c9-4d2c-b2b1-4d4a1d829816" config-ref="sf-ncu-config" readTimeoutUnit="MICROSECONDS" target="leadsourcedesiredstarttimeVar">
+					<repeatable-in-memory-iterable />
+					<salesforce:salesforce-query ><![CDATA[select Id, LeadSource, NEP_Desired_Start_timeframe__c
+from lead where Id = ':nuexternalLeadId']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{"nuexternalLeadId" : vars.id_vars[0].ExternalLeadId }]]]></salesforce:parameters>
+					<salesforce:headers />
+				</salesforce:query>
+				<logger level="INFO" doc:name="Logger leadSource and Desired Start Time" doc:id="12eeb901-232c-4044-8591-8a481a36d444" message="#[vars.leadsourcedesiredstarttimeVar]"/>
+				<ee:transform doc:name="Transform Message to NU Fields" doc:id="6103caf9-1c2e-474c-85a1-43bcbd47cf89">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="leadsourcedesiredstarttimeEUVar" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"Desired_Start_timeframe__c" : vars.leadsourcedesiredstarttimeVar[0].NEP_Desired_Start_timeframe__c as String default "",
+	"LeadSource" : vars.leadsourcedesiredstarttimeVar[0].LeadSource as String default ""
+	
+}]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger for Lead Source and Desired Start Time Framme" doc:id="902f9637-2504-495c-b338-5074f4a035b7" message="#[vars.leadsourcedesiredstarttimeEUVar]" doc:description="Transform NEP_Desired_Start_timeframe__c to Desired_Start_timeframe__c for EU"/>
+				<ee:transform doc:name="Transform Payload + Vertical" doc:id="cda04d2d-5cf8-42af-8f2a-f84d6bed420a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+// get Object
+var mypayload = payload[0] 
+var myvertical = {"Vertical__c": vars.verticalpayloadVar}
+ var myleadsourcedesiredstarttimeeVar =vars.leadsourcedesiredstarttimeEUVar
+---
+	
+	
+	[
+		mypayload ++ myvertical ++ myleadsourcedesiredstarttimeeVar
+		
+	]
+	
+
+
+
+
+
+	
+	
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise>
+				<set-payload value="#[payload]" doc:name="Set Payload to Default Payload" doc:id="9f5b15d3-5c91-40d5-82f8-f41423d451a6" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<flow name="post:\qt-test\lead-insert:application\json:nu-qt-integrations-inbound-config" doc:id="485c2ae6-5717-455d-9bc8-ec59a661a2f1">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="cb6ebfa9-5a5e-4e71-a42a-d1029785f323">
+			<ee:message>
+				<ee:set-payload resource="qt-test-Insert-lead-mapping.dwl" />
+			
+
+</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="id_vars"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	ExternalLeadId: payload.ExternalLeadId
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Insert",
+	sourceAppId: "sf-ncu",
+	sourceEntityId: payload.ExternalLeadId,
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: null,
+	targetEntityName: "QT_Lead__c",
+	action:"vendor/qt-test-insert-lead"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="dba31567-9abc-4212-9d95-e5e7970e3b7f" message="Input Payload #[payload]" />
+		<salesforce:query doc:name="sf-eu query for existing lead." doc:id="66f390c8-193c-43c4-91d2-1cf90b7e578b" config-ref="sf-ncu-config" target="existingLeadRecord">
+			<salesforce:salesforce-query ><![CDATA[SELECT
+	Id
+FROM
+	QT_lead__c
+WHERE
+	ExternalLeadId__c =  ':externalLeadId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"externalLeadId" : payload.ExternalLeadId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<choice doc:name="Choice" doc:id="71421621-259a-46d6-80cd-e24fbdff912b" >
+			<when expression="#[sizeOf(vars.existingLeadRecord) &lt; 1]">
+				<salesforce:create type="QT_Lead__c" doc:name="sf-eu-insert lead" doc:id="f090766d-3c1e-47b7-aa6b-efe2f9f6d4c7" config-ref="sf-ncu-config"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="b09b4630-f9f2-47a8-aa8e-3d464eefbc19" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"message":"Lead already exist in the system."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="724abe51-32b8-4741-876e-35a0519b2ab6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="2448f9fc-b859-4d38-b1bb-605fc378e2d5" message="@@ After Update #[payload]  contextData:  #[vars.contextData]" />
+		<ee:transform doc:name="Transform Message" doc:id="dfa9e5cb-547a-470b-abf0-cd08d8f88485" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors  
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="5d4b0950-d8f7-45f5-a5eb-5250dd1dce98" >
+			<flow-ref doc:name="TransactionLog_flow" doc:id="2283d049-c37b-44aa-9ea9-f9ad1c90cad1" name="LogTransaction_flow" />
+		</async>
+    </flow>
+    <flow name="post:\eu\stop-call:application\json:nu-qt-integrations-inbound-config" doc:id="55120bc9-1f66-449f-943c-e2beb22324ad">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="ba7c50eb-4ac9-4b0d-826f-8cff869c4a98">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="id_vars"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	ExternalLeadId: payload.ExternalLeadId
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: "sf-ncu",
+	sourceEntityId: payload.ExternalLeadId,
+	sourceEntityName: "Lead",
+	targetAppId: "sf-eu",
+	targetEntityId: null,
+	targetEntityName: "Lead",
+	action:"vendor/eu-stop-call"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="6bb3c059-ef15-4890-a250-07fb0b71be35" message="Input Payload #[payload]" />
+		<salesforce:query doc:name="sf-eu query for existing Lead" doc:id="f1fca9a9-3953-41db-a26e-cd2eb07d02e3" config-ref="sf-eu-config-uat" target="existingLeadRecord" readTimeoutUnit="HOURS">
+			<salesforce:salesforce-query ><![CDATA[SELECT
+	Id
+FROM
+	Lead
+WHERE
+	ExternalLeadId__c =  ':externalLeadId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"externalLeadId" : payload.ExternalLeadId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Existing Lead Logger" doc:id="43089214-5e71-40c5-a689-0f26f1af5213" message="@@existin LeadRecord #[vars.existingLeadRecord]"/>
+		<choice doc:name="Choice" doc:id="d608562e-9735-416d-9e18-f6c0308ec874" >
+			<when expression="#[sizeOf(vars.existingLeadRecord) &gt; 0]">
+				<ee:transform doc:name="Transform Message" doc:id="2e29ae19-3685-460f-9cb5-8f1a1fcb8270">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+
+---
+[{
+	Id: vars.existingLeadRecord[0].Id,
+	IsStopCall__c: true,
+	StopCallDateTime__c: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"},
+	StopCallReason__c : payload.Reason	
+}]]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Update payload Logger" doc:id="b89019f1-23f7-4a79-bf2c-21df46d70b4c" message="@@ Update Payload #[payload]"/>
+				<salesforce:update type="Lead" doc:name="sfeu-update" doc:id="cdc0566c-86ca-4a28-8bae-7989fded95f9" config-ref="sf-eu-config-uat" />
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="7ccde1a8-c01a-452b-8194-f4c9b09bceba" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"message":"Lead not found to do stop call update."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="28aba8c8-8ba9-4079-9c42-d8672712451b" />
+		<ee:transform doc:name="Transform Message" doc:id="ed93df02-f257-4168-a93e-725fc2f4c19f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="30fcc05d-7117-4c97-91f3-36269805876d" message="After Update #[payload]" />
+		<ee:transform doc:name="Transform Message" doc:id="5372726f-e840-409f-bdf0-81c0a98c501c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+   Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="e3e5c992-1bdb-486a-8ae1-6d13de00fe81" >
+			<flow-ref doc:name="LogTransaction flow" doc:id="a84100bb-1866-42e0-ba5b-2ba8c179a5fa" name="LogTransaction_flow" />
+		</async>
+    </flow>
+    <flow name="post:\qt-test\stop-call:application\json:nu-qt-integrations-inbound-config" doc:id="d01b833f-e949-4dc9-ba50-42997d9d97b3">
+        <ee:transform doc:name="Transform Lead Payload" doc:id="e95acf5e-cd1e-41bf-b662-18bc20fe1cd6">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="id_vars"><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	ExternalLeadId: payload.ExternalLeadId
+}]]]></ee:set-variable>
+				<ee:set-variable variableName="payload_info"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="contextData" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	transType: "Update",
+	sourceAppId: "sf-ncu",
+	sourceEntityId: payload.ExternalLeadId,
+	sourceEntityName: "Lead",
+	targetAppId: "sf-ncu",
+	targetEntityId: null,
+	targetEntityName: "QT_Lead__c",
+	action:"vendor/qt-test-stop-call"
+}]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Input Payload" doc:id="afc2ea8f-fcce-4714-8eaa-cc62f6c900c0" message="Input Payload #[payload]" />
+		<salesforce:query doc:name="sf-eu query for existing Lead" doc:id="32841375-4775-4aae-a9b5-68fe0871a47b" config-ref="sf-ncu-config" target="existingLeadRecord" readTimeoutUnit="HOURS">
+			<salesforce:salesforce-query ><![CDATA[SELECT
+	Id
+FROM
+	QT_Lead__c
+WHERE
+	ExternalLeadId__c =  ':externalLeadId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"externalLeadId" : payload.ExternalLeadId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Existing Lead Logger" doc:id="e0e4b2a1-42b4-4a3c-a3c4-6efb96787b4d" message="@@existin LeadRecord #[vars.existingLeadRecord]"/>
+		<choice doc:name="Choice" doc:id="398e5595-b27a-4f89-a0ca-53eb89525293" >
+			<when expression="#[sizeOf(vars.existingLeadRecord) &gt; 0]">
+				<ee:transform doc:name="Transform Message" doc:id="492cb4b6-4e1e-463f-9ad5-942c0d19813f">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+
+---
+[{
+	Id: vars.existingLeadRecord[0].Id,
+	IsStopCall__c: true,
+	StopCallDateTime__c: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"},
+	StopCallReason__c: payload.Reason	
+}]]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Update payload Logger" doc:id="0d33f72f-cb32-4fba-8ad7-957033035732" message="@@ Update Payload #[payload]"/>
+				<salesforce:update type="QT_Lead__c" doc:name="sfeu-update" doc:id="a40c2432-61d4-41a7-a808-8d12fa1df153" config-ref="sf-ncu-config" />
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="79aca4a1-1834-421a-a51b-11efdbb1ea3e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"message":"Lead not found to do stop call update."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="d5b28921-c44a-435b-9ffd-6df16cd341b2" />
+		<ee:transform doc:name="Transform Message" doc:id="7255e18d-e2f4-4729-af1a-a62e0e20c353" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="result_vars" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items map (value, index) -> {
+	Id: value."payload".id,
+	payload: value."payload".id,
+	message: value.message,
+	errors: value.exception.message
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="After Update" doc:id="c5b06f23-47a2-4b3e-824d-7d8e3974046e" message="After Update #[payload]" />
+		<ee:transform doc:name="Transform Message" doc:id="6c56de5e-fba5-49c8-91b5-53efb326e85e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+  {
+    Status: if(payload[0].errors == null)"Success" else "Failure",
+    TransType: vars.contextData.transType,
+    TargetAppId: vars.contextData.targetAppId,
+    TargetEntity: vars.contextData.targetEntityName,
+    Id:vars.result_vars[0].Id,
+    TransactionId:vars.serviceTransId,
+    Action: vars.contextData.action,
+    Message: vars.result_vars[0].errors
+  }
+]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="contextDataAfter" ><![CDATA[output application/java
+---
+{
+	targetEntityId: vars.result_vars[0].Id,
+	completedOn: now() as DateTime{format: "yyyy-MM-dd'T'HH:MM:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<async doc:name="Async" doc:id="3ed0471e-35a4-4a0a-8a59-c3b2a8355248" >
+			<flow-ref doc:name="LogTransaction flow" doc:id="53224c41-34ed-4253-ad49-1e93c9f02af5" name="LogTransaction_flow" />
+		</async>
+    </flow>
+</mule>
